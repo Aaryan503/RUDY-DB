@@ -1,4 +1,4 @@
-module KVStore
+module RUDY
 
 go 1.26.3
 

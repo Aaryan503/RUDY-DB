@@ -16,6 +16,7 @@ type Table struct {
 	Name    string         `json:"name"`
 	Columns []Column       `json:"columns,omitempty"`
 	Rows    map[string]Row `json:"rows,omitempty"`
+	lock    sync.RWMutex   `json:"-"`
 }
 type Column struct {
 	Name string `json:"name"`
@@ -109,12 +110,15 @@ func (db *Database) createTable(name string, columns []Column) (*Table, error) {
 }
 
 func (db *Database) insertRow(tableName string, rowID string, row Row) (Row, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
 	table, exists := db.tables[tableName]
+	db.mu.RUnlock()
+
 	if !exists {
 		return nil, fmt.Errorf("table does not exist")
 	}
+	table.lock.Lock()
+	defer table.lock.Unlock()
 	_, exists = table.Rows[rowID]
 	if exists {
 		return nil, fmt.Errorf("row already exists")
@@ -209,11 +213,13 @@ func (db *Database) deleteTable(name string) error {
 
 func (db *Database) deleteRow(tableName, rowId string) error {
 	db.mu.Lock()
-	defer db.mu.Unlock()
 	table, exists := db.tables[tableName]
+	db.mu.Unlock()
 	if !exists {
 		return fmt.Errorf("table does not exist")
 	}
+	table.lock.Lock()
+	defer table.lock.Unlock()
 	_, exists = table.Rows[rowId]
 	if !exists {
 		return fmt.Errorf("row does not exist")
@@ -234,12 +240,12 @@ func (db *Database) deleteRow(tableName, rowId string) error {
 	return nil
 }
 
-func (db *Database) getTables() []Table {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-	var result []Table
+func (db *Database) getTables() []*Table {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	var result []*Table
 	for _, table := range db.tables {
-		result = append(result, *table)
+		result = append(result, table)
 	}
 	return result
 }
@@ -256,11 +262,13 @@ func (db *Database) getTable(tableName string) (*Table, error) {
 
 func (db *Database) getRow(tableName, rowId string) (Row, error) {
 	db.mu.RLock()
-	defer db.mu.RUnlock()
 	table, ok := db.tables[tableName]
+	db.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("table does not exist")
 	}
+	table.lock.RLock()
+	defer table.lock.RUnlock()
 	row, ok := table.Rows[rowId]
 	if !ok {
 		return nil, fmt.Errorf("row does not exist")
@@ -498,7 +506,7 @@ func deleteRow(w http.ResponseWriter, r *http.Request) {
 
 func getTables(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var result []Table
+	var result []*Table
 	result = db.getTables()
 	json.NewEncoder(w).Encode(result)
 }
