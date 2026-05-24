@@ -88,34 +88,14 @@ func (db *Database) insertRow(tableName string, rowID string, row Row) (Row, err
 	if exists {
 		return nil, fmt.Errorf("row already exists")
 	}
+
 	for _, column := range table.Columns {
 		value, exists := row[column.Name]
 		if !exists {
 			return nil, fmt.Errorf("missing column: %s", column.Name)
 		}
-		switch column.Type {
-
-		case "string":
-			_, ok := value.(string)
-			if !ok {
-				return nil, fmt.Errorf("column %s must be string", column.Name)
-			}
-
-		case "int":
-			number, ok := value.(float64)
-			if !ok {
-				return nil, fmt.Errorf("column %s must be int", column.Name)
-			}
-
-			if number != float64(int(number)) {
-				return nil, fmt.Errorf("column %s must be integer", column.Name)
-			}
-
-		case "bool":
-			_, ok := value.(bool)
-			if !ok {
-				return nil, fmt.Errorf("column %s must be bool", column.Name)
-			}
+		if string(value.Type) != column.Type {
+			return nil, fmt.Errorf("column %s: expected %s, got %s", column.Name, column.Type, value.Type)
 		}
 	}
 
@@ -306,9 +286,7 @@ func (db *Database) loadSnapshot() error {
 	} else {
 		db.tables = snap.Items
 	}
-
 	db.lastOpNumber = snap.LastOpNumber
-
 	return nil
 }
 
@@ -363,7 +341,6 @@ func (db *Database) loadWAL() error {
 func (db *Database) snapshotWorker() {
 	for range db.snapshotChan {
 		err := db.createSnapshot()
-
 		if err != nil {
 			fmt.Println(err)
 		}

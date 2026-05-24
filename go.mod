@@ -1,4 +1,4 @@
-module RUDY
+module rudy
 
 go 1.26.3
 
