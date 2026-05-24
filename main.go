@@ -17,17 +17,24 @@ type Item struct {
 	Value string `json:"value"`
 }
 
-type Store struct {
-	mu      sync.RWMutex
-	items   map[string]Item
-	walFile *os.File
+type WAL struct {
+	OpNumber  int       `json:"opNumber"`
+	Operation string    `json:"operation"`
+	Key       string    `json:"key"`
+	Value     string    `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
-type WAL struct {
-	Operation string
-	Key       string
-	Value     string
-	Timestamp time.Time
+type Snapshot struct {
+	LastOpNumber int             `json:"lastOpNumber"`
+	Items        map[string]Item `json:"items"`
+}
+
+type Store struct {
+	mu           sync.RWMutex
+	items        map[string]Item
+	walFile      *os.File
+	lastOpNumber int
 }
 
 var store Store
@@ -35,7 +42,8 @@ var store Store
 func (s *Store) getAll() []Item {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var result []Item
+	result := make([]Item, 0, len(s.items))
+
 	for _, item := range s.items {
 		result = append(result, item)
 	}
@@ -46,64 +54,128 @@ func (s *Store) getItem(key string) (Item, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	item, exists := s.items[key]
-	if !exists {
-		return Item{}, false
-	}
-	return item, true
+	return item, exists
 }
 
 func (s *Store) putItem(item *Item, key string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	op := WAL{
+		OpNumber:  s.lastOpNumber + 1,
 		Operation: "PUT",
 		Key:       key,
 		Value:     item.Value,
 		Timestamp: time.Now(),
 	}
-
 	err := s.appendWAL(op)
 	if err != nil {
 		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	item.Key = key
 	s.items[key] = *item
+	s.lastOpNumber = op.OpNumber
+	if s.lastOpNumber%10 == 0 {
+		err = s.createSnapshot()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func (s *Store) deleteItem(key string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Store) deleteItem(key string) (bool, error) {
+	s.mu.RLock()
 	_, exists := s.items[key]
+	s.mu.RUnlock()
 	if !exists {
-		return false
+		return false, nil
 	}
 	op := WAL{
+		OpNumber:  s.lastOpNumber + 1,
 		Operation: "DELETE",
 		Key:       key,
 		Timestamp: time.Now(),
 	}
 	err := s.appendWAL(op)
 	if err != nil {
-		return false
+		return false, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.items, key)
-	return true
+	s.lastOpNumber = op.OpNumber
+	if s.lastOpNumber%10 == 0 {
+		err = s.createSnapshot()
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 func (s *Store) appendWAL(op WAL) error {
-	jsonBytes, err := json.Marshal(op)
+	bytes, err := json.Marshal(op)
 	if err != nil {
 		return err
 	}
-	_, err = s.walFile.Write(append(jsonBytes, '\n'))
+	_, err = s.walFile.Write(append(bytes, '\n'))
 	if err != nil {
 		return err
 	}
-	err = s.walFile.Sync()
+	return s.walFile.Sync()
+}
+
+func (s *Store) createSnapshot() error {
+	file, err := os.Create("snapshot.json")
 	if err != nil {
 		return err
 	}
+	defer file.Close()
+	snap := Snapshot{
+		LastOpNumber: s.lastOpNumber,
+		Items:        s.items,
+	}
+	encoder := json.NewEncoder(file)
+	err = encoder.Encode(snap)
+	if err != nil {
+		return err
+	}
+	err = file.Sync()
+	if err != nil {
+		return err
+	}
+	s.walFile.Close()
+	os.Create("wal.log")
+	wal, err := os.OpenFile(
+		"wal.log",
+		os.O_CREATE|os.O_RDWR|os.O_APPEND,
+		0644,
+	)
+	if err != nil {
+		return err
+	}
+	s.walFile = wal
+	_, err = s.walFile.Seek(0, 0)
+	return err
+}
+
+func (s *Store) loadSnapshot() error {
+	_, err := os.Stat("snapshot.json")
+	if os.IsNotExist(err) {
+		return nil
+	}
+	file, err := os.Open("snapshot.json")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	var snap Snapshot
+	err = json.NewDecoder(file).Decode(&snap)
+	if err != nil {
+		return err
+	}
+	s.items = snap.Items
+	s.lastOpNumber = snap.LastOpNumber
 	return nil
 }
 
@@ -112,9 +184,7 @@ func (s *Store) loadWAL() error {
 	if err != nil {
 		return err
 	}
-
 	decoder := json.NewDecoder(s.walFile)
-
 	for {
 		var op WAL
 		err := decoder.Decode(&op)
@@ -123,6 +193,9 @@ func (s *Store) loadWAL() error {
 		}
 		if err != nil {
 			return err
+		}
+		if op.OpNumber <= s.lastOpNumber {
+			continue
 		}
 		switch op.Operation {
 		case "PUT":
@@ -133,6 +206,7 @@ func (s *Store) loadWAL() error {
 		case "DELETE":
 			delete(s.items, op.Key)
 		}
+		s.lastOpNumber = op.OpNumber
 	}
 	return nil
 }
@@ -140,15 +214,20 @@ func (s *Store) loadWAL() error {
 func main() {
 	wal, err := os.OpenFile(
 		"wal.log",
-		os.O_CREATE|os.O_APPEND|os.O_RDWR,
+		os.O_CREATE|os.O_RDWR|os.O_APPEND,
 		0644,
 	)
 	if err != nil {
 		panic(err)
 	}
+	defer wal.Close()
 	store = Store{
 		items:   make(map[string]Item),
 		walFile: wal,
+	}
+	err = store.loadSnapshot()
+	if err != nil {
+		panic(err)
 	}
 	err = store.loadWAL()
 	if err != nil {
@@ -159,9 +238,8 @@ func main() {
 	r.Get("/items/{key}", getItem)
 	r.Put("/items/{key}", putItem)
 	r.Delete("/items/{key}", deleteItem)
-	fmt.Println("Server is running on port 8080")
-	defer wal.Close()
-	err = http.ListenAndServe(":8080", r)
+	fmt.Println("Server running on :8080")
+	http.ListenAndServe(":8080", r)
 }
 
 func getAllItems(w http.ResponseWriter, r *http.Request) {
@@ -173,10 +251,9 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 	item, exists := store.getItem(key)
 	if !exists {
-		http.Error(w, "item not found", http.StatusNotFound)
+		http.Error(w, "item not found", 404)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(item)
 }
 
@@ -185,23 +262,26 @@ func putItem(w http.ResponseWriter, r *http.Request) {
 	var item Item
 	err := json.NewDecoder(r.Body).Decode(&item)
 	if err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		http.Error(w, "invalid json", 400)
 		return
 	}
-	newerr := store.putItem(&item, key)
-	if newerr != nil {
-		http.Error(w, "storage failure", http.StatusInternalServerError)
+	err = store.putItem(&item, key)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(item)
 }
 
 func deleteItem(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
-	exists := store.deleteItem(key)
-	if !exists {
-		http.Error(w, "item not found", http.StatusNotFound)
+	ok, err := store.deleteItem(key)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	if !ok {
+		http.Error(w, "item not found", 404)
 		return
 	}
 	w.Write([]byte("deleted"))
