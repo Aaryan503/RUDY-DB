@@ -34,6 +34,7 @@ func main() {
 	}
 	go db.snapshotWorker()
 	r := chi.NewRouter()
+	r.Post("/query", handleQuery)
 	r.Post("/tables/{name}", createTable)
 	r.Post("/tables/{tableName}/rows/{rowId}", insertRow)
 	r.Delete("/tables/{name}", deleteTable)

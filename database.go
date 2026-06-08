@@ -241,6 +241,29 @@ func (db *Database) getRow(tableName, rowId string) (Row, error) {
 	return row, nil
 }
 
+func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool) ([]Row, error) {
+	table, err := db.getTable(tableName)
+	if err != nil {
+		return nil, err
+	}
+	table.lock.RLock()
+	defer table.lock.RUnlock()
+	var result []Row
+	for _, row := range table.Rows {
+		if filter != nil && !filter(row) {
+			continue
+		}
+		filteredRow := make(Row)
+		for _, field := range fields {
+			if val, ok := row[field]; ok {
+				filteredRow[field] = val
+			}
+		}
+		result = append(result, filteredRow)
+	}
+	return result, nil
+}
+
 func (db *Database) appendWAL(op WAL) error {
 	bytes, err := json.Marshal(op)
 	if err != nil {

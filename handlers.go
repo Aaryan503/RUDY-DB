@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -94,4 +95,21 @@ func getRow(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 404)
 	}
 	json.NewEncoder(w).Encode(row)
+}
+
+func handleQuery(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "could not read query", http.StatusBadRequest)
+		return
+	}
+	query := string(body)
+	exec := newExecutor(&db)
+	result, err := exec.execute(query)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
