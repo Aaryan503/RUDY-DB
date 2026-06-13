@@ -43,12 +43,20 @@ func (e *Executor) execute(query string) (interface{}, error) {
 
 			switch column.Type {
 			case "int":
-				valFloat, err := strconv.ParseFloat(valStr, 64)
+				number, err := strconv.ParseFloat(valStr, 64)
 				if err != nil {
 					return nil, fmt.Errorf("column %s must be int, got %s", column.Name, valStr)
 				}
+				if number != float64(int(number)) {
+					return nil, fmt.Errorf("column %s must be integer", column.Name)
+				}
+				newRow[column.Name] = number
+			case "float":
+				valFloat, err := strconv.ParseFloat(valStr, 64)
+				if err != nil {
+					return nil, fmt.Errorf("column %s must be float, got %s", column.Name, valStr)
+				}
 				newRow[column.Name] = valFloat
-
 			case "bool":
 				valBool, err := strconv.ParseBool(valStr)
 				if err != nil {

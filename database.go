@@ -19,7 +19,7 @@ type Database struct {
 
 func validType(t string) bool {
 	switch t {
-	case "string", "int", "bool":
+	case "string", "int", "bool", "float":
 		return true
 	default:
 		return false
@@ -110,7 +110,11 @@ func (db *Database) insertRow(tableName string, rowID string, row Row) (Row, err
 			if number != float64(int(number)) {
 				return nil, fmt.Errorf("column %s must be integer", column.Name)
 			}
-
+		case "float":
+			_, ok := value.(float64)
+			if !ok {
+				return nil, fmt.Errorf("column %s must be a float", column.Name)
+			}
 		case "bool":
 			_, ok := value.(bool)
 			if !ok {
@@ -242,9 +246,9 @@ func (db *Database) getRow(tableName, rowId string) (Row, error) {
 }
 
 func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool) ([]Row, error) {
-	table, err := db.getTable(tableName)
-	if err != nil {
-		return nil, err
+	table, err := db.tables[tableName]
+	if !err {
+		return nil, fmt.Errorf("table does not exist")
 	}
 	table.lock.RLock()
 	defer table.lock.RUnlock()
