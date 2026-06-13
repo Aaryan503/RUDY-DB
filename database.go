@@ -88,7 +88,6 @@ func (db *Database) insertRow(tableName string, rowID string, row Row) (Row, err
 	if exists {
 		return nil, fmt.Errorf("row already exists")
 	}
-
 	for _, column := range table.Columns {
 		value, exists := row[column.Name]
 		if !exists {
@@ -336,7 +335,9 @@ func (db *Database) loadSnapshot() error {
 	} else {
 		db.tables = snap.Items
 	}
+
 	db.lastOpNumber = snap.LastOpNumber
+
 	return nil
 }
 
@@ -391,6 +392,7 @@ func (db *Database) loadWAL() error {
 func (db *Database) snapshotWorker() {
 	for range db.snapshotChan {
 		err := db.createSnapshot()
+
 		if err != nil {
 			fmt.Println(err)
 		}

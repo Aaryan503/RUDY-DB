@@ -29,39 +29,16 @@ func insertRow(w http.ResponseWriter, r *http.Request) {
 	tableName := chi.URLParam(r, "tableName")
 	rowID := chi.URLParam(r, "rowId")
 
-	var raw map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&raw)
+	var row Row
+
+	err := json.NewDecoder(r.Body).Decode(&row)
 	if err != nil {
 		http.Error(w, "invalid json", 400)
 		return
 	}
 
-	table, err := db.getTable(tableName)
-	if err != nil {
-		http.Error(w, err.Error(), 404)
-		return
-	}
-	colTypes := make(map[string]string, len(table.Columns))
-	for _, c := range table.Columns {
-		colTypes[c.Name] = c.Type
-	}
-
-	row := make(Row, len(raw))
-	for key, rawVal := range raw {
-		colType, known := colTypes[key]
-		if !known {
-			http.Error(w, "unknown column: "+key, 400)
-			return
-		}
-		v, err := toValue(key, colType, rawVal)
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-		row[key] = v
-	}
-
 	insertedRow, err := db.insertRow(tableName, rowID, row)
+
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
