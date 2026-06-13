@@ -317,7 +317,7 @@ func (db *Database) getRow(tableName, rowId string) (Row, error) {
 	return row, nil
 }
 
-func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool, limit int) (*SelectResult, error) {
+func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool, limit int, distinct bool) (*SelectResult, error) {
 	table, err := db.getTable(tableName)
 	if err != nil {
 		return nil, err
@@ -325,23 +325,37 @@ func (db *Database) selectRows(tableName string, fields []string, filter func(Ro
 	table.lock.RLock()
 	defer table.lock.RUnlock()
 	var rows []Row
+	var seen map[string]struct{}
+	if distinct {
+		seen = make(map[string]struct{})
+	}
 	for _, row := range table.Rows {
 		if filter != nil && !filter(row) {
 			continue
 		}
-		filteredRow := make(Row)
+		filteredRow := make(Row, len(fields))
+
 		for _, field := range fields {
 			if val, ok := row[field]; ok {
 				filteredRow[field] = val
 			}
+		}
+		if distinct {
+			key := rowKey(filteredRow, fields)
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
 		}
 		rows = append(rows, filteredRow)
 		if limit > 0 && len(rows) >= limit {
 			break
 		}
 	}
-	result := SelectResult{Columns: fields, Rows: rows}
-	return &result, nil
+	return &SelectResult{
+		Columns: fields,
+		Rows:    rows,
+	}, nil
 }
 
 func (db *Database) appendWAL(op WAL) error {
@@ -478,4 +492,15 @@ func (db *Database) snapshotWorker() {
 			fmt.Println(err)
 		}
 	}
+}
+
+func rowKey(row Row, fields []string) string {
+	values := make([]interface{}, 0, len(fields))
+
+	for _, field := range fields {
+		values = append(values, row[field])
+	}
+
+	b, _ := json.Marshal(values)
+	return string(b)
 }

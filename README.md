@@ -1,10 +1,10 @@
 # RUDY DB
 
-RUDY is a simple database engine built from scratch in Go. It supports a subset of SQL through two interfaces — a REST API and an interactive CLI — and is designed around three core properties:
+RUDY is a simple database engine built from scratch in Go. It supports some part of SQL through two interfaces, an API and an interactive CLI, and is designed keeping the following in mind:
 
-- **Persistent** — All changes survive process restarts. Writes go to a Write-Ahead Log (WAL) before being applied, and periodic snapshots compact the log. On startup, RUDY replays any WAL entries after the last snapshot to restore exact state.
-- **Concurrent** — RUDY uses two-level locking: a database-level lock for table map access, and a per-table lock for row access. Reads on different tables never block each other.
-- **Recoverable** — If the process crashes mid-operation, the WAL ensures no committed write is lost. The snapshot + WAL replay model guarantees consistent recovery.
+- **Persistent** — All changes survive restarts/reboots of the program or the pc. Writes go to a Write-Ahead Log before being applied, and periodic snapshots (after every 10 WAL entries for now, number can be changed on your use case) to minimize the log and time to read. On startup, RUDY reruns any WAL entries after the last snapshot which stores the state of the db to restore exact state.
+- **Concurrent** — RUDY uses two-level locking: a database-level lock for table map access, and a per-table lock for row access. Reads on different tables never block each other. Operations are locked with necessary level locks to attempt to ensure data loss and wrong updates.
+- **Recoverable** — If the process crashes mid-operation, the WAL ensures no committed write is lost. The snapshot and WAL replay model guarantees consistent recovery.
 
 ---
 
@@ -56,10 +56,8 @@ The server starts at `http://localhost:8080` by default. The CLI launches in the
 
 **Supported WHERE operators:** `=`, `!=`, `<`, `>`, `<=`, `>=`
 
-Multiple WHERE conditions can be combined with `AND`, and result can be limited with `LIMIT`
+Multiple WHERE conditions can be combined with `AND`, `OR` and `NOT`. Result can be limited with `LIMIT` and distinct results can be viewed with `DISTINCT`
 
->[!WARNING]
->`OR` in WHERE statements, and aggregate operators are not supported yet
 ---
 
 ## API Mode
@@ -162,7 +160,7 @@ curl -X POST http://localhost:8080/query -d "CREATE TABLE products (name string,
 curl -X POST http://localhost:8080/query -d "INSERT INTO products VALUES ('keyboard', 49.99, true)"
 
 # Select
-curl -X POST http://localhost:8080/query -d "SELECT name,price FROM products WHERE price > 20 AND inStock = true LIMIT 3"
+curl -X POST http://localhost:8080/query -d "SELECT DISTINCT name,price FROM products WHERE price > 20 AND inStock = true OR price<10 LIMIT 3"
 
 # Update
 curl -X POST http://localhost:8080/query -d "UPDATE products SET price = 279.99, inStock = false WHERE name = 'monitor'"
@@ -184,7 +182,6 @@ curl -X POST http://localhost:8080/query -d "DROP products"
 When you run `go run .`, RUDY starts an interactive SQL prompt in the terminal alongside the API server. Type any supported SQL statement and press Enter. Type `Ctrl+C` to quit.
 
 ```
-```text
 rudydb> CREATE TABLE employees (name string, department string, salary float, active bool)
 Table: employees (4 columns)
 
@@ -216,7 +213,7 @@ Inserted:
   salary = 65000
   active = false
 
-rudydb> SELECT * FROM employees WHERE salary > 80000 AND active = true
+rudydb> SELECT DISTINCT * FROM employees WHERE salary > 80000 AND active = true
 
 name           department     salary         active
 -------------- -------------- -------------- --------------
@@ -249,7 +246,6 @@ Done
 ## Caveats & Limitations
 
 **Query support**
-- WHERE clauses support simple comparisons only. Conditions are `AND`ed together; `OR` is not yet supported, however it will be the next major feature to be added.
 - No `JOIN`, `GROUP BY`, `ORDER BY`, `LIMIT`, or aggregate functions (`COUNT`, `SUM`, etc.) are implemented yet, will be supported soon.
 
 **Types**

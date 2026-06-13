@@ -271,7 +271,7 @@ func (e *Executor) execute(query string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return e.db.selectRows(s.TableName, s.Fields, filter, s.Limit)
+		return e.db.selectRows(s.TableName, s.Fields, filter, s.Limit, s.Distinct)
 
 	case *DropStatement:
 		e.db.mu.RLock()

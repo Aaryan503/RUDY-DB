@@ -16,6 +16,7 @@ type SelectStatement struct {
 	Star      bool
 	Fields    []string
 	Limit     int
+	Distinct  bool
 }
 
 func (s *SelectStatement) statementNode() {}
@@ -192,6 +193,12 @@ func (p *Parser) parseCondition() (*ExprNode, error) {
 func (p *Parser) parseSelectStatement() (*SelectStatement, error) {
 	stmt := &SelectStatement{}
 	p.nextToken()
+	if strings.ToUpper(p.curToken.Value) == "DISTINCT" {
+		stmt.Distinct = true
+		p.nextToken()
+	} else {
+		stmt.Distinct = false
+	}
 	if p.curToken.Type == TokenSymbol && p.curToken.Value == "*" {
 		stmt.Fields = nil
 		stmt.Star = true
