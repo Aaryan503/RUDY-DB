@@ -177,9 +177,9 @@ func (db *Database) deleteTable(name string) error {
 }
 
 func (db *Database) deleteRow(tableName, rowId string) error {
-	db.mu.Lock()
+	db.mu.RLock()
 	table, exists := db.tables[tableName]
-	db.mu.Unlock()
+	db.mu.RUnlock()
 	if !exists {
 		return fmt.Errorf("table does not exist")
 	}
@@ -296,6 +296,8 @@ func (db *Database) createSnapshot() error {
 	if err != nil {
 		return err
 	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	db.walFile.Close()
 	wal, err := os.OpenFile(
 		"wal.log",

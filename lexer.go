@@ -41,6 +41,13 @@ func (l *Lexer) readChar() {
 	l.readPosition++
 }
 
+func (l *Lexer) peekChar() byte {
+	if l.readPosition >= len(l.input) {
+		return 0
+	}
+	return l.input[l.readPosition]
+}
+
 func (l *Lexer) skipWhitespace() {
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
 		l.readChar()
@@ -57,6 +64,31 @@ func (l *Lexer) nextToken() Token {
 		tok = Token{Type: TokenSymbol, Value: ";"}
 	case 0:
 		tok = Token{Type: TokenEOF, Value: ""}
+	case '=':
+		if l.peekChar() == '=' {
+			tok = Token{Type: TokenSymbol, Value: "="}
+		} else {
+			tok = Token{Type: TokenSymbol, Value: "="}
+		}
+	case '!':
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = Token{Type: TokenSymbol, Value: "!="}
+		}
+	case '<':
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = Token{Type: TokenSymbol, Value: "<="}
+		} else {
+			tok = Token{Type: TokenSymbol, Value: "<"}
+		}
+	case '>':
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = Token{Type: TokenSymbol, Value: ">="}
+		} else {
+			tok = Token{Type: TokenSymbol, Value: ">"}
+		}
 	default:
 		if isLetter(l.ch) {
 			tok.Value = l.readIdentifier()
@@ -115,6 +147,7 @@ func isDigit(ch byte) bool {
 func lookupIdentifier(ident string) TokenType {
 	keywords := map[string]bool{
 		"SELECT": true, "FROM": true, "CREATE": true, "TABLE": true, "INSERT": true, "INTO": true, "VALUES": true,
+		"WHERE": true, "DELETE": true, "DROP": true, "AND": true, "OR": true, "NOT": true,
 	}
 	if keywords[strings.ToUpper(ident)] {
 		return TokenKeyword

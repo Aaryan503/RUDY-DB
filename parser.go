@@ -9,8 +9,18 @@ type Statement interface {
 	statementNode()
 }
 
+type WhereClause struct {
+	Conditions []Condition
+}
+
+type DeleteStatement struct {
+	TableName string
+	Where     *WhereClause
+}
+
 type SelectStatement struct {
 	TableName string
+	Where     *WhereClause
 	Fields    []string
 }
 
@@ -60,6 +70,32 @@ func (p *Parser) parseStatement() (Statement, error) {
 		}
 	}
 	return nil, fmt.Errorf("unsupported statement: %s", p.curToken.Value)
+}
+
+func (p *Parser) parseWhere() (*WhereClause, error) {
+	where := &WhereClause{}
+	for {
+		if p.curToken.Type != TokenIdentifier {
+			return nil, fmt.Errorf("expected field name for the WHERE clause but got %s", p.curToken.Value)
+		}
+		field := p.curToken.Value
+		p.nextToken()
+		op := p.curToken.Value
+		if op != "=" && op != "!=" && op != "<" && op != ">" && op != "<=" && op != ">=" {
+			return nil, fmt.Errorf("expected operator, got %s", op)
+		}
+		p.nextToken()
+		if p.curToken.Type != TokenIdentifier {
+			return nil, fmt.Errorf("expected an identifier in WHERE after operator got %s", p.curToken.Value)
+		}
+		where.Conditions = append(where.Conditions, Condition{field, op, p.curToken.Value})
+		if strings.ToUpper(p.curToken.Value) == "AND" {
+			p.nextToken()
+			continue
+		}
+		break
+	}
+	return where, nil
 }
 
 func (p *Parser) parseSelectStatement() (*SelectStatement, error) {

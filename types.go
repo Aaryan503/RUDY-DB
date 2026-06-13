@@ -37,3 +37,9 @@ type Snapshot struct {
 type CreateTableRequest struct {
 	Columns []Column `json:"columns"`
 }
+
+type Condition struct {
+	Field    string
+	Operator string
+	Value    string
+}
