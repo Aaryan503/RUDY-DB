@@ -154,6 +154,19 @@ func (p *Parser) parseCondition() (*ExprNode, error) {
 		p.nextToken()
 		return node, nil
 	}
+	if strings.ToUpper(p.curToken.Value) == "NOT" {
+		p.nextToken()
+		left, err := p.parseCondition()
+		if err != nil {
+			return nil, err
+		}
+		left = &ExprNode{
+			Op:   "NOT",
+			Left: left,
+		}
+		return left, nil
+	}
+
 	if p.curToken.Type != TokenIdentifier {
 		return nil, fmt.Errorf("expected field name in WHERE, got %s", p.curToken.Value)
 	}

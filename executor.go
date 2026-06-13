@@ -26,13 +26,16 @@ func evalNode(node *ExprNode, row Row) (bool, error) {
 	}
 	left, err := evalNode(node.Left, row)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	if node.Op == "OR" && left {
 		return true, nil
 	}
 	if node.Op == "AND" && !left {
 		return false, nil
+	}
+	if node.Op == "NOT" {
+		return !left, nil
 	}
 	return evalNode(node.Right, row)
 }
