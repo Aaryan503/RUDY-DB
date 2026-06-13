@@ -6,10 +6,11 @@ import (
 )
 
 type Table struct {
-	Name    string         `json:"name"`
-	Columns []Column       `json:"columns,omitempty"`
-	Rows    map[string]Row `json:"rows,omitempty"`
-	lock    sync.RWMutex   `json:"-"`
+	Name      string         `json:"name"`
+	Columns   []Column       `json:"columns,omitempty"`
+	Rows      map[string]Row `json:"rows,omitempty"`
+	NextRowId float64        `json:"nextRowId"`
+	lock      sync.RWMutex   `json:"-"`
 }
 
 type Column struct {

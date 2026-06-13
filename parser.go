@@ -16,6 +16,7 @@ type WhereClause struct {
 type SelectStatement struct {
 	TableName string
 	Where     *WhereClause
+	Star      bool
 	Fields    []string
 }
 
@@ -41,6 +42,12 @@ type DeleteStatement struct {
 }
 
 func (d *DeleteStatement) statementNode() {}
+
+type DropStatement struct {
+	TableName string
+}
+
+func (d *DropStatement) statementNode() {}
 
 type Parser struct {
 	l         *Lexer
@@ -71,6 +78,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 			return p.parseInsertStatement()
 		case "DELETE":
 			return p.parseDeleteStatement()
+		case "DROP":
+			return p.parseDropStatement()
 		}
 	}
 	return nil, fmt.Errorf("unsupported statement: %s", p.curToken.Value)
@@ -105,11 +114,17 @@ func (p *Parser) parseWhere() (*WhereClause, error) {
 func (p *Parser) parseSelectStatement() (*SelectStatement, error) {
 	stmt := &SelectStatement{}
 	p.nextToken()
-	for p.curToken.Type == TokenIdentifier {
-		stmt.Fields = append(stmt.Fields, p.curToken.Value)
+	if p.curToken.Type == TokenSymbol && p.curToken.Value == "*" {
+		stmt.Fields = nil
+		stmt.Star = true
 		p.nextToken()
-		if p.curToken.Type == TokenSymbol && p.curToken.Value == "," {
+	} else {
+		for p.curToken.Type == TokenIdentifier {
+			stmt.Fields = append(stmt.Fields, p.curToken.Value)
 			p.nextToken()
+			if p.curToken.Type == TokenSymbol && p.curToken.Value == "," {
+				p.nextToken()
+			}
 		}
 	}
 	if strings.ToUpper(p.curToken.Value) != "FROM" {
@@ -227,5 +242,15 @@ func (p *Parser) parseDeleteStatement() (*DeleteStatement, error) {
 		}
 		stmt.Where = where
 	}
+	return stmt, nil
+}
+
+func (p *Parser) parseDropStatement() (*DropStatement, error) {
+	stmt := &DropStatement{}
+	p.nextToken()
+	if p.curToken.Type != TokenIdentifier {
+		return nil, fmt.Errorf("expected table name, got %s", p.curToken.Value)
+	}
+	stmt.TableName = p.curToken.Value
 	return stmt, nil
 }

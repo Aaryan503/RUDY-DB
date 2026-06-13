@@ -156,10 +156,7 @@ func (e *Executor) execute(query string) (interface{}, error) {
 				newRow[column.Name] = valStr
 			}
 		}
-		table.lock.RLock()
-		rowId := fmt.Sprintf("row%d", len(table.Rows)+1)
-		table.lock.RUnlock()
-		return e.db.insertRow(s.TableName, rowId, newRow)
+		return e.db.insertRow(s.TableName, newRow)
 
 	case *DeleteStatement:
 		e.db.mu.RLock()
@@ -194,6 +191,11 @@ func (e *Executor) execute(query string) (interface{}, error) {
 		if !exists {
 			return nil, fmt.Errorf("table does not exist")
 		}
+		if s.Star {
+			for _, col := range table.Columns {
+				s.Fields = append(s.Fields, col.Name)
+			}
+		}
 		for _, field := range s.Fields {
 			fieldExists := false
 			for _, col := range table.Columns {
@@ -211,6 +213,16 @@ func (e *Executor) execute(query string) (interface{}, error) {
 			return nil, err
 		}
 		return e.db.selectRows(s.TableName, s.Fields, filter)
+
+	case *DropStatement:
+		e.db.mu.RLock()
+		table, exists := e.db.tables[s.TableName]
+		e.db.mu.RUnlock()
+		if !exists {
+			return nil, fmt.Errorf("table does not exist")
+		}
+		err := e.db.deleteTable(s.TableName)
+		return map[string]int{"deleted": len(table.Rows)}, err
 
 	default:
 		return nil, fmt.Errorf("unknown statement type")

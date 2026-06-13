@@ -27,17 +27,14 @@ func createTable(w http.ResponseWriter, r *http.Request) {
 
 func insertRow(w http.ResponseWriter, r *http.Request) {
 	tableName := chi.URLParam(r, "tableName")
-	rowID := chi.URLParam(r, "rowId")
-
 	var row Row
-
 	err := json.NewDecoder(r.Body).Decode(&row)
 	if err != nil {
 		http.Error(w, "invalid json", 400)
 		return
 	}
 
-	insertedRow, err := db.insertRow(tableName, rowID, row)
+	insertedRow, err := db.insertRow(tableName, row)
 
 	if err != nil {
 		http.Error(w, err.Error(), 400)

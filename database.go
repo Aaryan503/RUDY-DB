@@ -74,7 +74,7 @@ func (db *Database) createTable(name string, columns []Column) (*Table, error) {
 	return table, nil
 }
 
-func (db *Database) insertRow(tableName string, rowID string, row Row) (Row, error) {
+func (db *Database) insertRow(tableName string, row Row) (Row, error) {
 	db.mu.RLock()
 	table, exists := db.tables[tableName]
 	db.mu.RUnlock()
@@ -84,6 +84,8 @@ func (db *Database) insertRow(tableName string, rowID string, row Row) (Row, err
 	}
 	table.lock.Lock()
 	defer table.lock.Unlock()
+	table.NextRowId++
+	rowID := fmt.Sprintf("row %f", table.NextRowId)
 	_, exists = table.Rows[rowID]
 	if exists {
 		return nil, fmt.Errorf("row already exists")
@@ -282,7 +284,6 @@ func (db *Database) appendWAL(op WAL) error {
 
 func (db *Database) createSnapshot() error {
 	db.mu.RLock()
-	defer db.mu.RUnlock()
 	file, err := os.Create("snapshot.json")
 	if err != nil {
 		return err
@@ -292,6 +293,7 @@ func (db *Database) createSnapshot() error {
 		LastOpNumber: db.lastOpNumber,
 		Items:        db.tables,
 	}
+	db.mu.RUnlock()
 	err = json.NewEncoder(file).Encode(snap)
 	if err != nil {
 		return err
@@ -301,7 +303,6 @@ func (db *Database) createSnapshot() error {
 		return err
 	}
 	db.mu.Lock()
-	defer db.mu.Unlock()
 	db.walFile.Close()
 	wal, err := os.OpenFile(
 		"wal.log",
@@ -312,6 +313,7 @@ func (db *Database) createSnapshot() error {
 		return err
 	}
 	db.walFile = wal
+	db.mu.Unlock()
 	return nil
 }
 

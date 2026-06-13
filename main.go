@@ -36,7 +36,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Post("/query", handleQuery)
 	r.Post("/tables/{name}", createTable)
-	r.Post("/tables/{tableName}/rows/{rowId}", insertRow)
+	r.Post("/tables/{tableName}/rows", insertRow)
 	r.Delete("/tables/{name}", deleteTable)
 	r.Delete("/tables/{tableName}/row/{rowId}", deleteRow)
 	r.Get("/tables", getTables)
