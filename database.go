@@ -246,9 +246,9 @@ func (db *Database) getRow(tableName, rowId string) (Row, error) {
 }
 
 func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool) ([]Row, error) {
-	table, err := db.tables[tableName]
-	if !err {
-		return nil, fmt.Errorf("table does not exist")
+	table, err := db.getTable(tableName)
+	if err != nil {
+		return nil, err
 	}
 	table.lock.RLock()
 	defer table.lock.RUnlock()
