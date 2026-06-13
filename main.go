@@ -88,6 +88,12 @@ func main() {
 				for k, val := range v {
 					fmt.Printf("%s: %d\n", k, val)
 				}
+			case *Table:
+				if v == nil {
+					fmt.Println("Done")
+				} else {
+					fmt.Printf("Table: %s (%d columns)\n", v.Name, len(v.Columns))
+				}
 			default:
 				fmt.Printf("%+v\n", v)
 			}

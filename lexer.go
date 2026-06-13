@@ -89,6 +89,20 @@ func (l *Lexer) nextToken() Token {
 		} else {
 			tok = Token{Type: TokenSymbol, Value: ">"}
 		}
+	case '-':
+		if isDigit(l.peekChar()) {
+			tok.Type = TokenIdentifier
+			tok.Value = l.readNumber()
+			return tok
+		}
+		tok = Token{Type: TokenSymbol, Value: "-"}
+	case '+':
+		if isDigit(l.peekChar()) {
+			tok.Type = TokenIdentifier
+			tok.Value = l.readNumber()
+			return tok
+		}
+		tok = Token{Type: TokenSymbol, Value: "+"}
 	default:
 		if isLetter(l.ch) {
 			tok.Value = l.readIdentifier()
@@ -119,6 +133,9 @@ func (l *Lexer) readIdentifier() string {
 
 func (l *Lexer) readNumber() string {
 	position := l.position
+	if l.ch == '-' || l.ch == '+' {
+		l.readChar()
+	}
 	for isDigit(l.ch) {
 		l.readChar()
 	}

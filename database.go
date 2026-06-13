@@ -330,9 +330,9 @@ func (db *Database) selectRows(tableName string, fields []string, filter func(Ro
 			continue
 		}
 		filteredRow := make(Row)
-		for _, field := range fields {
-			if val, ok := row[field]; ok {
-				filteredRow[field] = val
+		for _, col := range table.Columns {
+			if val, ok := row[col.Name]; ok {
+				filteredRow[col.Name] = val
 			}
 		}
 		result = append(result, filteredRow)
