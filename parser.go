@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -18,6 +19,7 @@ type SelectStatement struct {
 	Where     *WhereClause
 	Star      bool
 	Fields    []string
+	Limit     int
 }
 
 func (s *SelectStatement) statementNode() {}
@@ -154,6 +156,15 @@ func (p *Parser) parseSelectStatement() (*SelectStatement, error) {
 			return nil, err
 		}
 		stmt.Where = where
+	}
+	if strings.ToUpper(p.curToken.Value) == "LIMIT" {
+		p.nextToken()
+		val := p.curToken.Value
+		limit, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, fmt.Errorf("expected a numerical limit, got %s", p.curToken.Value)
+		}
+		stmt.Limit = limit
 	}
 	if p.curToken.Type == TokenSymbol && p.curToken.Value == ";" {
 		p.nextToken()

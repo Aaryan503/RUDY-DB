@@ -48,3 +48,8 @@ type Condition struct {
 	Operator string
 	Value    string
 }
+
+type SelectResult struct {
+	Columns []string `json:"columns"`
+	Rows    []Row    `json:"rows"`
+}

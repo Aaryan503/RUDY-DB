@@ -317,27 +317,31 @@ func (db *Database) getRow(tableName, rowId string) (Row, error) {
 	return row, nil
 }
 
-func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool) ([]Row, error) {
+func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool, limit int) (*SelectResult, error) {
 	table, err := db.getTable(tableName)
 	if err != nil {
 		return nil, err
 	}
 	table.lock.RLock()
 	defer table.lock.RUnlock()
-	var result []Row
+	var rows []Row
 	for _, row := range table.Rows {
 		if filter != nil && !filter(row) {
 			continue
 		}
 		filteredRow := make(Row)
-		for _, col := range table.Columns {
-			if val, ok := row[col.Name]; ok {
-				filteredRow[col.Name] = val
+		for _, field := range fields {
+			if val, ok := row[field]; ok {
+				filteredRow[field] = val
 			}
 		}
-		result = append(result, filteredRow)
+		rows = append(rows, filteredRow)
+		if limit > 0 && len(rows) >= limit {
+			break
+		}
 	}
-	return result, nil
+	result := SelectResult{Columns: fields, Rows: rows}
+	return &result, nil
 }
 
 func (db *Database) appendWAL(op WAL) error {

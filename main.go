@@ -72,22 +72,38 @@ func main() {
 				continue
 			}
 			switch v := result.(type) {
-			case []Row:
-				for i, row := range v {
-					fmt.Printf("Row %d:\n", i+1)
-					for k, val := range row {
-						fmt.Printf("  %s = %v\n", k, val)
-					}
+			case *SelectResult:
+				if len(v.Columns) == 0 {
+					fmt.Println("No columns selected")
+					break
 				}
+				for _, col := range v.Columns {
+					fmt.Printf("%-15s", col)
+				}
+				fmt.Println()
+				for range v.Columns {
+					fmt.Printf("%-15s", "--------------")
+				}
+				fmt.Println()
+				for _, row := range v.Rows {
+					for _, col := range v.Columns {
+						fmt.Printf("%-15v", row[col])
+					}
+					fmt.Println()
+				}
+				fmt.Printf("\n%d row(s)\n", len(v.Rows))
+
 			case Row:
 				fmt.Println("Inserted:")
 				for k, val := range v {
 					fmt.Printf("  %s = %v\n", k, val)
 				}
+
 			case map[string]int:
 				for k, val := range v {
 					fmt.Printf("%s: %d\n", k, val)
 				}
+
 			case *Table:
 				if v == nil {
 					fmt.Println("Done")
