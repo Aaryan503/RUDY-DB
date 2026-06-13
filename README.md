@@ -44,6 +44,7 @@ The server starts at `http://localhost:8080` by default. The CLI launches in the
 | Select all | `SELECT * FROM name` |
 | Select columns | `SELECT col1, col2 FROM name` |
 | Select with filter | `SELECT * FROM name WHERE col op val` |
+| Select with limit | `SELECT col1,col2 FROM name WHERE col1 op val LIMIT number` |
 | Delete with filter | `DELETE FROM name WHERE col op val` |
 | Delete all rows | `DELETE FROM name` |
 | Update rows | `UPDATE name SET col = val WHERE col op val` |
@@ -55,7 +56,7 @@ The server starts at `http://localhost:8080` by default. The CLI launches in the
 
 **Supported WHERE operators:** `=`, `!=`, `<`, `>`, `<=`, `>=`
 
-Multiple WHERE conditions can be combined with `AND`.
+Multiple WHERE conditions can be combined with `AND`, and result can be limited with `LIMIT`
 
 >[!WARNING]
 >`OR` in WHERE statements, and aggregate operators are not supported yet
@@ -161,7 +162,7 @@ curl -X POST http://localhost:8080/query -d "CREATE TABLE products (name string,
 curl -X POST http://localhost:8080/query -d "INSERT INTO products VALUES ('keyboard', 49.99, true)"
 
 # Select
-curl -X POST http://localhost:8080/query -d "SELECT name,price FROM products WHERE price > 20 AND inStock = true"
+curl -X POST http://localhost:8080/query -d "SELECT name,price FROM products WHERE price > 20 AND inStock = true LIMIT 3"
 
 # Update
 curl -X POST http://localhost:8080/query -d "UPDATE products SET price = 279.99, inStock = false WHERE name = 'monitor'"
@@ -187,6 +188,7 @@ When you run `go run .`, RUDY also starts an interactive SQL prompt in the termi
 When you run `go run .`, RUDY starts an interactive SQL prompt in the terminal alongside the API server. Type any supported SQL statement and press Enter. Type `Ctrl+C` to quit.
 
 ```
+```text
 rudydb> CREATE TABLE employees (name string, department string, salary float, active bool)
 Table: employees (4 columns)
 
@@ -204,26 +206,49 @@ Inserted:
   salary = 72000
   active = true
 
-rudydb> SELECT * FROM employees WHERE salary > 80000 AND active = true
-Row 1:
-  name = alice
-  department = engineering
-  salary = 95000
-  active = true
-Row 2:
+rudydb> INSERT INTO employees VALUES ('carol', 'engineering', 110000.00, true)
+Inserted:
   name = carol
   department = engineering
   salary = 110000
   active = true
 
+rudydb> INSERT INTO employees VALUES ('dave', 'sales', 65000.00, false)
+Inserted:
+  name = dave
+  department = sales
+  salary = 65000
+  active = false
+
+rudydb> SELECT * FROM employees WHERE salary > 80000 AND active = true
+
+name           department     salary         active
+-------------- -------------- -------------- --------------
+alice          engineering    95000          true
+carol          engineering    110000         true
+
+2 row(s)
+
 rudydb> UPDATE employees SET salary = 100000.00 WHERE name = 'bob'
 updated: 1
+
+rudydb> SELECT name,salary FROM employees LIMIT 3
+
+name           salary
+-------------- --------------
+alice          95000
+bob            100000
+carol          110000
+
+3 row(s)
 
 rudydb> DELETE FROM employees WHERE active = false
 deleted: 1
 
 rudydb> DROP employees
 Done
+```
+
 ```
 
 ## Caveats & Limitations
