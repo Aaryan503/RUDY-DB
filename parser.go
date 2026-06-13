@@ -10,10 +10,6 @@ type Statement interface {
 	statementNode()
 }
 
-type WhereClause struct {
-	Conditions []Condition
-}
-
 type SelectStatement struct {
 	TableName string
 	Where     *WhereClause
@@ -98,30 +94,86 @@ func (p *Parser) parseStatement() (Statement, error) {
 }
 
 func (p *Parser) parseWhere() (*WhereClause, error) {
-	where := &WhereClause{}
-	for {
-		if p.curToken.Type != TokenIdentifier {
-			return nil, fmt.Errorf("expected field name for the WHERE clause but got %s", p.curToken.Value)
-		}
-		field := p.curToken.Value
-		p.nextToken()
-		op := p.curToken.Value
-		if op != "=" && op != "!=" && op != "<" && op != ">" && op != "<=" && op != ">=" {
-			return nil, fmt.Errorf("expected operator, got %s", op)
-		}
-		p.nextToken()
-		if p.curToken.Type != TokenIdentifier {
-			return nil, fmt.Errorf("expected an identifier in WHERE after operator got %s", p.curToken.Value)
-		}
-		where.Conditions = append(where.Conditions, Condition{field, op, p.curToken.Value})
-		p.nextToken()
-		if strings.ToUpper(p.curToken.Value) == "AND" {
-			p.nextToken()
-			continue
-		}
-		break
+	root, err := p.parseOrExpr()
+	if err != nil {
+		return nil, err
 	}
-	return where, nil
+	return &WhereClause{root: root}, nil
+}
+
+func (p *Parser) parseOrExpr() (*ExprNode, error) {
+	left, err := p.parseAndExpr()
+	if err != nil {
+		return nil, err
+	}
+	for strings.ToUpper(p.curToken.Value) == "OR" {
+		p.nextToken()
+		right, err := p.parseAndExpr()
+		if err != nil {
+			return nil, err
+		}
+		left = &ExprNode{
+			Op:    "OR",
+			Left:  left,
+			Right: right,
+		}
+	}
+	return left, nil
+}
+
+func (p *Parser) parseAndExpr() (*ExprNode, error) {
+	left, err := p.parseCondition()
+	if err != nil {
+		return nil, err
+	}
+	for strings.ToUpper(p.curToken.Value) == "AND" {
+		p.nextToken()
+		right, err := p.parseCondition()
+		if err != nil {
+			return nil, err
+		}
+		left = &ExprNode{
+			Op:    "AND",
+			Left:  left,
+			Right: right,
+		}
+	}
+	return left, nil
+}
+
+func (p *Parser) parseCondition() (*ExprNode, error) {
+	if p.curToken.Type == TokenSymbol && p.curToken.Value == "(" {
+		p.nextToken()
+		node, err := p.parseOrExpr()
+		if err != nil {
+			return nil, err
+		}
+		if p.curToken.Value != ")" {
+			return nil, fmt.Errorf("expected closing ), got %s", p.curToken.Value)
+		}
+		p.nextToken()
+		return node, nil
+	}
+	if p.curToken.Type != TokenIdentifier {
+		return nil, fmt.Errorf("expected field name in WHERE, got %s", p.curToken.Value)
+	}
+	field := p.curToken.Value
+	p.nextToken()
+	op := p.curToken.Value
+	if op != "=" && op != "!=" && op != "<" && op != ">" && op != "<=" && op != ">=" {
+		return nil, fmt.Errorf("expected operator, got %s", op)
+	}
+	p.nextToken()
+	if p.curToken.Type != TokenIdentifier {
+		return nil, fmt.Errorf("expected value after operator, got %s", p.curToken.Value)
+	}
+	cond := &Condition{
+		Operator: op,
+		Field:    field,
+		Value:    p.curToken.Value,
+	}
+	p.nextToken()
+	return &ExprNode{Condition: cond}, nil
 }
 
 func (p *Parser) parseSelectStatement() (*SelectStatement, error) {

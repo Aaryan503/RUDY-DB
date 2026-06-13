@@ -13,36 +13,61 @@ func newExecutor(db *Database) *Executor {
 	return &Executor{db: db}
 }
 
+func evalNode(node *ExprNode, row Row) (bool, error) {
+	if node == nil {
+		return true, nil
+	}
+	if node.Condition != nil {
+		val, ok := row[node.Condition.Field]
+		if !ok {
+			return false, nil
+		}
+		return evaluateThis(val, node.Condition.Operator, node.Condition.Value)
+	}
+	left, err := evalNode(node.Left, row)
+	if err != nil {
+		return false, nil
+	}
+	if node.Op == "OR" && left {
+		return true, nil
+	}
+	if node.Op == "AND" && !left {
+		return false, nil
+	}
+	return evalNode(node.Right, row)
+}
+
 func filter(where *WhereClause, columns []Column) (func(Row) bool, error) {
 	if where == nil {
 		return nil, nil
 	}
-	for _, cond := range where.Conditions {
-		found := false
+	err := validateNode(where.root, columns)
+	if err != nil {
+		return nil, err
+	}
+	return func(row Row) bool {
+		result, _ := evalNode(where.root, row)
+		return result
+	}, nil
+}
+
+func validateNode(node *ExprNode, columns []Column) error {
+	if node == nil {
+		return nil
+	}
+	if node.Condition != nil {
 		for _, col := range columns {
-			if col.Name == cond.Field {
-				found = true
-				break
+			if col.Name == node.Condition.Field {
+				return nil
 			}
 		}
-		if !found {
-			return nil, fmt.Errorf("field %s does not match any column in the table", cond.Field)
-		}
+		return fmt.Errorf("unknown column in WHERE: %s", node.Condition.Field)
 	}
-	function := func(row Row) bool {
-		for _, cond := range where.Conditions {
-			val, ok := row[cond.Field]
-			if !ok {
-				return false
-			}
-			valid, err := evaluateThis(val, cond.Operator, cond.Value)
-			if err != nil || !valid {
-				return false
-			}
-		}
-		return true
+	err := validateNode(node.Left, columns)
+	if err != nil {
+		return err
 	}
-	return function, nil
+	return validateNode(node.Right, columns)
 }
 
 func evaluateThis(rowValue interface{}, op, field string) (bool, error) {

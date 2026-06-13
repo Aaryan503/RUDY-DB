@@ -49,6 +49,17 @@ type Condition struct {
 	Value    string
 }
 
+type ExprNode struct {
+	Op        string
+	Left      *ExprNode
+	Right     *ExprNode
+	Condition *Condition
+}
+
+type WhereClause struct {
+	root *ExprNode
+}
+
 type SelectResult struct {
 	Columns []string `json:"columns"`
 	Rows    []Row    `json:"rows"`

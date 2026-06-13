@@ -14,6 +14,8 @@ var db Database
 
 func main() {
 	var i int
+	fmt.Println("Welcome to RUDYDB, a simple, recoverable and concurrent DB implementation in Go.\nDo you want to run a CLI or an API?\nEnter 1 for API, 2 for CLI: ")
+	fmt.Scanln(&i)
 	wal, err := os.OpenFile(
 		"wal.log",
 		os.O_CREATE|os.O_RDWR|os.O_APPEND,
@@ -36,8 +38,6 @@ func main() {
 		panic(err)
 	}
 	go db.snapshotWorker()
-	fmt.Println("Welcome to RUDYDB, a simple, recoverable and concurrent DB implementation in Go.\nDo you want to run a CLI or an API?\nEnter 1 for API, 2 for CLI: ")
-	fmt.Scanln(&i)
 	if i == 1 {
 		r := chi.NewRouter()
 		r.Post("/query", handleQuery)
