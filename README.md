@@ -52,7 +52,7 @@ The server starts at `http://localhost:8080` by default. The CLI launches in the
 | Update all rows | `UPDATE name SET col = val` |
 | Drop table | `DROP name` |
 
-**Supported column types:** `string`, `int`, `float`, `bool`
+**Supported column types:** `string`, `int`, `float`, `bool`, along with negative numbers
 
 **Supported WHERE operators:** `=`, `!=`, `<`, `>`, `<=`, `>=`
 
@@ -181,10 +181,6 @@ curl -X POST http://localhost:8080/query -d "DROP products"
 
 ## CLI Mode
 
-When you run `go run .`, RUDY also starts an interactive SQL prompt in the terminal. Type any supported SQL statement and press Enter to execute. Results are printed as JSON.
-
-## CLI Mode
-
 When you run `go run .`, RUDY starts an interactive SQL prompt in the terminal alongside the API server. Type any supported SQL statement and press Enter. Type `Ctrl+C` to quit.
 
 ```
@@ -249,7 +245,6 @@ rudydb> DROP employees
 Done
 ```
 
-```
 
 ## Caveats & Limitations
 
