@@ -42,6 +42,7 @@ func main() {
 	r.Get("/tables", getTables)
 	r.Get("/tables/{tableName}", getTable)
 	r.Get("/tables/{tableName}/rows/{rowId}", getRow)
+	r.Put("/tables/{tableName}/rows/{rowId}", updateRow)
 	fmt.Println("Server running on :8080")
 	err = http.ListenAndServe(":8080", r)
 	if err != nil {

@@ -39,6 +39,10 @@ type CreateTableRequest struct {
 	Columns []Column `json:"columns"`
 }
 
+type UpdateRowRequest struct {
+	Updates map[string]string `json:"updates"`
+}
+
 type Condition struct {
 	Field    string
 	Operator string

@@ -33,16 +33,29 @@ func insertRow(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", 400)
 		return
 	}
-
 	insertedRow, err := db.insertRow(tableName, row)
-
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(insertedRow)
+}
+
+func updateRow(w http.ResponseWriter, r *http.Request) {
+	tableName := chi.URLParam(r, "tableName")
+	rowId := chi.URLParam(r, "rowId")
+	var req UpdateRowRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "invalid json", 400)
+	}
+	updatedRow, err := db.updateRow(tableName, rowId, req.Updates)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updatedRow)
 }
 
 func deleteTable(w http.ResponseWriter, r *http.Request) {

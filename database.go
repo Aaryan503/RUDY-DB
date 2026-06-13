@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -158,6 +159,75 @@ func (db *Database) insertRow(tableName string, row Row) (Row, error) {
 		}
 	}
 	return row, nil
+}
+
+func (db *Database) updateRow(tableName, rowId string, updates map[string]string) (Row, error) {
+	db.mu.RLock()
+	table, exists := db.tables[tableName]
+	db.mu.RUnlock()
+	if !exists {
+		return nil, fmt.Errorf("table does not exist")
+	}
+	table.lock.Lock()
+	defer table.lock.Unlock()
+	existing, exists := table.Rows[rowId]
+	if !exists {
+		return nil, fmt.Errorf("row does not exist")
+	}
+	updatedRow := make(Row)
+	for k, v := range existing {
+		updatedRow[k] = v
+	}
+	for colName, rawVal := range updates {
+		var col *Column
+		for i := range table.Columns {
+			if table.Columns[i].Name == colName {
+				col = &table.Columns[i]
+				break
+			}
+		}
+		if col == nil {
+			return nil, fmt.Errorf("unknown column: %s", colName)
+		}
+		switch col.Type {
+		case "string":
+			updatedRow[colName] = rawVal
+		case "int":
+			n, err := strconv.ParseFloat(rawVal, 64)
+			if err != nil || n != float64(int(n)) {
+				return nil, fmt.Errorf("column %s must be int", colName)
+			}
+			updatedRow[colName] = n
+		case "float":
+			n, err := strconv.ParseFloat(rawVal, 64)
+			if err != nil {
+				return nil, fmt.Errorf("column %s must be float", colName)
+			}
+			updatedRow[colName] = n
+		case "bool":
+			b, err := strconv.ParseBool(rawVal)
+			if err != nil {
+				return nil, fmt.Errorf("column %s must be bool", colName)
+			}
+			updatedRow[colName] = b
+		}
+	}
+
+	op := WAL{
+		OpNumber:  db.lastOpNumber + 1,
+		Operation: "UPDATE_ROW",
+		TableName: tableName,
+		RowID:     rowId,
+		RowData:   updatedRow,
+		Timestamp: time.Now(),
+	}
+	if err := db.appendWAL(op); err != nil {
+		return nil, err
+	}
+
+	table.Rows[rowId] = updatedRow
+	db.lastOpNumber = op.OpNumber
+	return updatedRow, nil
 }
 
 func (db *Database) deleteTable(name string) error {
@@ -384,6 +454,11 @@ func (db *Database) loadWAL() error {
 
 		case "DELETE_TABLE":
 			delete(db.tables, op.TableName)
+		case "UPDATE_ROW":
+			table, exists := db.tables[op.TableName]
+			if exists {
+				table.Rows[op.RowID] = op.RowData
+			}
 		}
 
 		db.lastOpNumber = op.OpNumber

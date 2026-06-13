@@ -41,6 +41,14 @@ type DeleteStatement struct {
 	Where     *WhereClause
 }
 
+func (u *UpdateStatement) statementNode() {}
+
+type UpdateStatement struct {
+	TableName string
+	Updates   map[string]string
+	Where     *WhereClause
+}
+
 func (d *DeleteStatement) statementNode() {}
 
 type DropStatement struct {
@@ -80,6 +88,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 			return p.parseDeleteStatement()
 		case "DROP":
 			return p.parseDropStatement()
+		case "UPDATE":
+			return p.parseUpdateStatement()
 		}
 	}
 	return nil, fmt.Errorf("unsupported statement: %s", p.curToken.Value)
@@ -102,6 +112,7 @@ func (p *Parser) parseWhere() (*WhereClause, error) {
 			return nil, fmt.Errorf("expected an identifier in WHERE after operator got %s", p.curToken.Value)
 		}
 		where.Conditions = append(where.Conditions, Condition{field, op, p.curToken.Value})
+		p.nextToken()
 		if strings.ToUpper(p.curToken.Value) == "AND" {
 			p.nextToken()
 			continue
@@ -217,6 +228,57 @@ func (p *Parser) parseInsertStatement() (*InsertStatement, error) {
 				p.nextToken()
 			}
 		}
+		p.nextToken()
+	}
+	return stmt, nil
+}
+
+func (p *Parser) parseUpdateStatement() (*UpdateStatement, error) {
+	stmt := &UpdateStatement{
+		Updates: make(map[string]string),
+	}
+	p.nextToken()
+	if p.curToken.Type != TokenIdentifier {
+		return nil, fmt.Errorf("expected table name, got %s", p.curToken.Value)
+	}
+	stmt.TableName = p.curToken.Value
+	p.nextToken()
+	if strings.ToUpper(p.curToken.Value) != "SET" {
+		return nil, fmt.Errorf("expected SET, got %s", p.curToken.Value)
+	}
+	p.nextToken()
+	for p.curToken.Type == TokenIdentifier {
+		colName := p.curToken.Value
+		p.nextToken()
+
+		if p.curToken.Value != "=" {
+			return nil, fmt.Errorf("expected = after column name, got %s", p.curToken.Value)
+		}
+		p.nextToken()
+
+		if p.curToken.Type != TokenIdentifier {
+			return nil, fmt.Errorf("expected value, got %s", p.curToken.Value)
+		}
+		stmt.Updates[colName] = p.curToken.Value
+		p.nextToken()
+		if p.curToken.Type == TokenSymbol && p.curToken.Value == "," {
+			p.nextToken()
+			continue
+		}
+		break
+	}
+	if len(stmt.Updates) == 0 {
+		return nil, fmt.Errorf("UPDATE requires at least one column assignment")
+	}
+	if strings.ToUpper(p.curToken.Value) == "WHERE" {
+		p.nextToken()
+		where, err := p.parseWhere()
+		if err != nil {
+			return nil, err
+		}
+		stmt.Where = where
+	}
+	if p.curToken.Type == TokenSymbol && p.curToken.Value == ";" {
 		p.nextToken()
 	}
 	return stmt, nil

@@ -158,6 +158,37 @@ func (e *Executor) execute(query string) (interface{}, error) {
 		}
 		return e.db.insertRow(s.TableName, newRow)
 
+	case *UpdateStatement:
+		e.db.mu.RLock()
+		table, exists := e.db.tables[s.TableName]
+		e.db.mu.RUnlock()
+		if !exists {
+			return nil, fmt.Errorf("table does not exist")
+		}
+
+		filterFn, err := filter(s.Where, table.Columns)
+		if err != nil {
+			return nil, err
+		}
+		table.lock.RLock()
+		var toUpdate []string
+		for id, row := range table.Rows {
+			if filterFn == nil || filterFn(row) {
+				toUpdate = append(toUpdate, id)
+			}
+		}
+		table.lock.RUnlock()
+
+		count := 0
+		for _, id := range toUpdate {
+			_, err := e.db.updateRow(s.TableName, id, s.Updates)
+			if err != nil {
+				return nil, err
+			}
+			count++
+		}
+		return map[string]int{"updated": count}, nil
+
 	case *DeleteStatement:
 		e.db.mu.RLock()
 		table, ok := e.db.tables[s.TableName]
