@@ -19,7 +19,7 @@ type Database struct {
 
 func validType(t string) bool {
 	switch t {
-	case "string", "int", "bool":
+	case "string", "int", "bool", "float":
 		return true
 	default:
 		return false
@@ -94,8 +94,33 @@ func (db *Database) insertRow(tableName string, rowID string, row Row) (Row, err
 		if !exists {
 			return nil, fmt.Errorf("missing column: %s", column.Name)
 		}
-		if string(value.Type) != column.Type {
-			return nil, fmt.Errorf("column %s: expected %s, got %s", column.Name, column.Type, value.Type)
+		switch column.Type {
+
+		case "string":
+			_, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("column %s must be string", column.Name)
+			}
+
+		case "int":
+			number, ok := value.(float64)
+			if !ok {
+				return nil, fmt.Errorf("column %s must be int", column.Name)
+			}
+
+			if number != float64(int(number)) {
+				return nil, fmt.Errorf("column %s must be integer", column.Name)
+			}
+		case "float":
+			_, ok := value.(float64)
+			if !ok {
+				return nil, fmt.Errorf("column %s must be a float", column.Name)
+			}
+		case "bool":
+			_, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("column %s must be bool", column.Name)
+			}
 		}
 	}
 
@@ -157,9 +182,9 @@ func (db *Database) deleteTable(name string) error {
 }
 
 func (db *Database) deleteRow(tableName, rowId string) error {
-	db.mu.Lock()
+	db.mu.RLock()
 	table, exists := db.tables[tableName]
-	db.mu.Unlock()
+	db.mu.RUnlock()
 	if !exists {
 		return fmt.Errorf("table does not exist")
 	}
@@ -221,6 +246,29 @@ func (db *Database) getRow(tableName, rowId string) (Row, error) {
 	return row, nil
 }
 
+func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool) ([]Row, error) {
+	table, err := db.getTable(tableName)
+	if err != nil {
+		return nil, err
+	}
+	table.lock.RLock()
+	defer table.lock.RUnlock()
+	var result []Row
+	for _, row := range table.Rows {
+		if filter != nil && !filter(row) {
+			continue
+		}
+		filteredRow := make(Row)
+		for _, field := range fields {
+			if val, ok := row[field]; ok {
+				filteredRow[field] = val
+			}
+		}
+		result = append(result, filteredRow)
+	}
+	return result, nil
+}
+
 func (db *Database) appendWAL(op WAL) error {
 	bytes, err := json.Marshal(op)
 	if err != nil {
@@ -253,6 +301,8 @@ func (db *Database) createSnapshot() error {
 	if err != nil {
 		return err
 	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	db.walFile.Close()
 	wal, err := os.OpenFile(
 		"wal.log",

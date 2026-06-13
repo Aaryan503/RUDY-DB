@@ -57,33 +57,8 @@ type CreateTableRequest struct {
 	Columns []Column `json:"columns"`
 }
 
-func toValue(colName, colType string, raw interface{}) (Value, error) {
-	switch colType {
-	case "string":
-		s, ok := raw.(string)
-		if !ok {
-			return Value{}, fmt.Errorf("column %s must be string", colName)
-		}
-		return Value{Type: ValueTypeString, Data: s}, nil
-
-	case "int":
-		f, ok := raw.(float64)
-		if !ok {
-			return Value{}, fmt.Errorf("column %s must be int", colName)
-		}
-		if f != float64(int(f)) {
-			return Value{}, fmt.Errorf("column %s must be integer", colName)
-		}
-		return Value{Type: ValueTypeInt, Data: int(f)}, nil
-
-	case "bool":
-		b, ok := raw.(bool)
-		if !ok {
-			return Value{}, fmt.Errorf("column %s must be bool", colName)
-		}
-		return Value{Type: ValueTypeBool, Data: b}, nil
-
-	default:
-		return Value{}, fmt.Errorf("unsupported type: %s", colType)
-	}
+type Condition struct {
+	Field    string
+	Operator string
+	Value    string
 }
