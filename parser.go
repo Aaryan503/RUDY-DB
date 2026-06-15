@@ -16,6 +16,11 @@ type Aggregate struct {
 	Alias   string
 }
 
+type Order struct {
+	Desc  bool
+	Field string
+}
+
 type SelectStatement struct {
 	TableName  string
 	Where      *WhereClause
@@ -24,6 +29,7 @@ type SelectStatement struct {
 	Limit      int
 	Distinct   bool
 	Aggregates []Aggregate
+	OrderBy    []Order
 }
 
 func (s *SelectStatement) statementNode() {}
@@ -273,6 +279,30 @@ func (p *Parser) parseSelectStatement() (*SelectStatement, error) {
 			return nil, err
 		}
 		stmt.Where = where
+	}
+	if strings.ToUpper(p.curToken.Value) == "ORDER" {
+		if len(stmt.Aggregates) != 0 {
+			return nil, fmt.Errorf("ORDER not supported with aggregate functions")
+		}
+		p.nextToken()
+		if strings.ToUpper(p.curToken.Value) != "BY" {
+			return nil, fmt.Errorf("expect BY after ORDER, got %s", p.curToken.Value)
+		}
+		var field string
+		p.nextToken()
+		for p.curToken.Type == TokenIdentifier {
+			field = p.curToken.Value
+			p.nextToken()
+			desc := false
+			if strings.ToUpper(p.curToken.Value) == "DESC" {
+				desc = true
+				p.nextToken()
+			}
+			stmt.OrderBy = append(stmt.OrderBy, Order{Desc: desc, Field: field})
+			if p.curToken.Type == TokenSymbol && p.curToken.Value == "," {
+				p.nextToken()
+			}
+		}
 	}
 	if strings.ToUpper(p.curToken.Value) == "LIMIT" {
 		p.nextToken()

@@ -8,6 +8,9 @@ import (
 	"testing"
 )
 
+//NOTE: THESE TESTS ARE AI GENERATED AND MEANT TO SERVE AS A QUICK SANITY CHECK FOR
+//OR WHOEVER IS RUNNING IT, TO VERIFY EVERYTHING IS WORKING AND NOTHING IS BROKEN
+
 // --------------------------------------------------------------------------
 // helpers
 // --------------------------------------------------------------------------

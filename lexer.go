@@ -173,6 +173,7 @@ func lookupIdentifier(ident string) TokenType {
 		"SELECT": true, "FROM": true, "CREATE": true, "TABLE": true, "INSERT": true, "INTO": true, "VALUES": true,
 		"WHERE": true, "DELETE": true, "DROP": true, "AND": true, "OR": true, "NOT": true, "UPDATE": true, "SET": true,
 		"LIMIT": true, "DISTINCT": true, "SUM": true, "AVG": true, "COUNT": true, "MIN": true, "MAX": true,
+		"ORDER": true, "BY": true, "ASC": true, "DESC": true,
 	}
 	if keywords[strings.ToUpper(ident)] {
 		return TokenKeyword

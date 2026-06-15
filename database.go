@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -317,7 +318,7 @@ func (db *Database) getRow(tableName, rowId string) (Row, error) {
 	return row, nil
 }
 
-func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool, limit int, distinct bool) (*SelectResult, error) {
+func (db *Database) selectRows(tableName string, fields []string, filter func(Row) bool, limit int, distinct bool, orders []Order) (*SelectResult, error) {
 	table, err := db.getTable(tableName)
 	if err != nil {
 		return nil, err
@@ -348,9 +349,12 @@ func (db *Database) selectRows(tableName string, fields []string, filter func(Ro
 			seen[key] = struct{}{}
 		}
 		rows = append(rows, filteredRow)
-		if limit > 0 && len(rows) >= limit {
-			break
-		}
+	}
+	if orders != nil {
+		sortRows(rows, orders)
+	}
+	if limit > 0 && limit <= len(rows) {
+		rows = rows[:limit]
 	}
 	return &SelectResult{
 		Columns: fields,
@@ -509,4 +513,64 @@ func rowKey(row Row, fields []string) string {
 
 	b, _ := json.Marshal(values)
 	return string(b)
+}
+
+func sortRows(rows []Row, orderBy []Order) {
+	sort.Slice(rows, func(i, j int) bool {
+		for _, order := range orderBy {
+			vali := rows[i][order.Field]
+			valj := rows[j][order.Field]
+			cmp := compare(vali, valj)
+			if cmp == 0 {
+				continue
+			}
+			if order.Desc {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return false
+	})
+}
+
+func compare(a, b interface{}) int {
+	switch av := a.(type) {
+	case int:
+		bv := b.(int)
+		if av < bv {
+			return -1
+		}
+		if av > bv {
+			return 1
+		}
+		return 0
+	case float64:
+		bv := b.(float64)
+		if av < bv {
+			return -1
+		}
+		if av > bv {
+			return 1
+		}
+		return 0
+	case string:
+		bv := b.(string)
+		if av < bv {
+			return -1
+		}
+		if av > bv {
+			return 1
+		}
+		return 0
+	case bool:
+		bv := b.(bool)
+		if av == bv {
+			return 0
+		}
+		if !av && bv {
+			return -1
+		}
+		return 1
+	}
+	return 0
 }

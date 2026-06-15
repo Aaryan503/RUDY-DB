@@ -278,7 +278,19 @@ func (e *Executor) execute(query string) (interface{}, error) {
 				}
 			}
 		}
-		res, err := e.db.selectRows(s.TableName, s.Fields, filter, s.Limit, s.Distinct)
+		for _, orderFields := range s.OrderBy {
+			fieldExists := false
+			for _, fields := range s.Fields {
+				if fields == orderFields.Field {
+					fieldExists = true
+					break
+				}
+			}
+			if !fieldExists {
+				return nil, fmt.Errorf("field %s in order is not included in the selection fields provided", orderFields.Field)
+			}
+		}
+		res, err := e.db.selectRows(s.TableName, s.Fields, filter, s.Limit, s.Distinct, s.OrderBy)
 		if err != nil {
 			return nil, err
 		}
