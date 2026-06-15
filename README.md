@@ -45,6 +45,7 @@ The server starts at `http://localhost:8080` by default. The CLI launches in the
 | Select columns | `SELECT col1, col2 FROM name` |
 | Select with filter | `SELECT * FROM name WHERE col op val` |
 | Select with limit | `SELECT col1,col2 FROM name WHERE col1 op val LIMIT number` |
+| Aggregate Select | `SELECT COUNT(*) AS aggcol FROM name where col1 op val` |
 | Delete with filter | `DELETE FROM name WHERE col op val` |
 | Delete all rows | `DELETE FROM name` |
 | Update rows | `UPDATE name SET col = val WHERE col op val` |
@@ -56,7 +57,12 @@ The server starts at `http://localhost:8080` by default. The CLI launches in the
 
 **Supported WHERE operators:** `=`, `!=`, `<`, `>`, `<=`, `>=`
 
+**Supported Aggregate operators:** `SUM`, `COUNT`, `AVG`, `MIN`, `MAX`
+
 Multiple WHERE conditions can be combined with `AND`, `OR` and `NOT`. Result can be limited with `LIMIT` and distinct results can be viewed with `DISTINCT`
+
+>[!Warning]
+>Aggregate operators with another field, for example, SELECT AVG(age), name from students, is not supported, as GROUP BY is not implemented yet
 
 ---
 
@@ -246,7 +252,7 @@ Done
 ## Caveats & Limitations
 
 **Query support**
-- No `JOIN`, `GROUP BY`, `ORDER BY`, `LIMIT`, or aggregate functions (`COUNT`, `SUM`, etc.) are implemented yet, will be supported soon.
+- No `JOIN`, `GROUP BY`, `ORDER BY` are implemented yet, will be supported soon.
 
 **Types**
 - `int` and `float` are both stored as `float64` internally (Go's JSON representation). Very large integers may lose precision.

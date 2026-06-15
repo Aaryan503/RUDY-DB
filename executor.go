@@ -271,7 +271,21 @@ func (e *Executor) execute(query string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return e.db.selectRows(s.TableName, s.Fields, filter, s.Limit, s.Distinct)
+		if len(s.Aggregates) > 0 && len(s.Fields) == 0 {
+			for _, agg := range s.Aggregates {
+				if agg.Field != "*" {
+					s.Fields = append(s.Fields, agg.Field)
+				}
+			}
+		}
+		res, err := e.db.selectRows(s.TableName, s.Fields, filter, s.Limit, s.Distinct)
+		if err != nil {
+			return nil, err
+		}
+		if len(s.Aggregates) > 0 {
+			return applyAggregates(res.Rows, s.Aggregates, table.Columns)
+		}
+		return res, nil
 
 	case *DropStatement:
 		e.db.mu.RLock()
@@ -286,4 +300,75 @@ func (e *Executor) execute(query string) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("unknown statement type")
 	}
+}
+
+func applyAggregates(rows []Row, aggregates []Aggregate, columns []Column) (Row, error) {
+	result := make(Row)
+	for _, aggregate := range aggregates {
+		key := aggregate.Alias
+		if key == "" {
+			if aggregate.Field == "*" {
+				key = aggregate.Keyword + "(*)"
+			} else {
+				key = aggregate.Keyword + "(" + aggregate.Field + ")"
+			}
+		}
+		switch aggregate.Keyword {
+		case "COUNT":
+			result[key] = len(rows)
+		case "MAX", "MIN", "SUM", "AVG":
+			var colType string
+			for _, col := range columns {
+				if col.Name == aggregate.Field {
+					colType = col.Type
+					break
+				}
+			}
+			if colType == "" {
+				return nil, fmt.Errorf("unknown column: %s", aggregate.Field)
+			}
+			if colType != "int" && colType != "float" {
+				return nil, fmt.Errorf("%s requires a numeric column", aggregate.Keyword)
+			}
+			var sum, min, max float64
+			first := true
+			for _, row := range rows {
+				var val float64
+				switch v := row[aggregate.Field].(type) {
+				case int:
+					val = float64(v)
+				case float64:
+					val = v
+				}
+				val, ok := row[aggregate.Field].(float64)
+				if !ok {
+					continue
+				}
+				sum += val
+				if first || val < min {
+					min = val
+				}
+				if first || val > max {
+					max = val
+				}
+				first = false
+			}
+
+			switch aggregate.Keyword {
+			case "SUM":
+				result[key] = sum
+			case "AVG":
+				if len(rows) > 0 {
+					result[key] = sum / float64(len(rows))
+				} else {
+					result[key] = 0.0
+				}
+			case "MIN":
+				result[key] = min
+			case "MAX":
+				result[key] = max
+			}
+		}
+	}
+	return result, nil
 }

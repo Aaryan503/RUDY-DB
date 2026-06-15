@@ -10,13 +10,20 @@ type Statement interface {
 	statementNode()
 }
 
+type Aggregate struct {
+	Keyword string
+	Field   string
+	Alias   string
+}
+
 type SelectStatement struct {
-	TableName string
-	Where     *WhereClause
-	Star      bool
-	Fields    []string
-	Limit     int
-	Distinct  bool
+	TableName  string
+	Where      *WhereClause
+	Star       bool
+	Fields     []string
+	Limit      int
+	Distinct   bool
+	Aggregates []Aggregate
 }
 
 func (s *SelectStatement) statementNode() {}
@@ -204,11 +211,49 @@ func (p *Parser) parseSelectStatement() (*SelectStatement, error) {
 		stmt.Star = true
 		p.nextToken()
 	} else {
-		for p.curToken.Type == TokenIdentifier {
-			stmt.Fields = append(stmt.Fields, p.curToken.Value)
+		for p.curToken.Type == TokenKeyword {
+			aggregateFunc := strings.ToUpper(p.curToken.Value)
+			if aggregateFunc != "MAX" && aggregateFunc != "MIN" && aggregateFunc != "AVG" && aggregateFunc != "SUM" && aggregateFunc != "COUNT" {
+				break
+			}
 			p.nextToken()
-			if p.curToken.Type == TokenSymbol && p.curToken.Value == "," {
+			if p.curToken.Value != "(" {
+				return nil, fmt.Errorf("expected ( after aggregate function, got %s", p.curToken.Value)
+			}
+			p.nextToken()
+			var field string
+			if aggregateFunc == "COUNT" && p.curToken.Value == "*" {
+				field = p.curToken.Value
+			} else if p.curToken.Type != TokenIdentifier {
+				return nil, fmt.Errorf("Expected field after aggregator function %s, got %s instead", aggregateFunc, p.curToken.Value)
+			} else {
+				field = p.curToken.Value
+			}
+			p.nextToken()
+			if p.curToken.Value != ")" {
+				return nil, fmt.Errorf("expected ) after %s field, got %s instead", field, p.curToken.Value)
+			}
+			p.nextToken()
+			agg := Aggregate{aggregateFunc, field, ""}
+			if strings.ToUpper(p.curToken.Value) == "AS" {
 				p.nextToken()
+				agg.Alias = p.curToken.Value
+				p.nextToken()
+			}
+			stmt.Aggregates = append(stmt.Aggregates, agg)
+			if p.curToken.Value == "," {
+				p.nextToken()
+				continue
+			}
+			break
+		}
+		if len(stmt.Aggregates) == 0 {
+			for p.curToken.Type == TokenIdentifier {
+				stmt.Fields = append(stmt.Fields, p.curToken.Value)
+				p.nextToken()
+				if p.curToken.Type == TokenSymbol && p.curToken.Value == "," {
+					p.nextToken()
+				}
 			}
 		}
 	}

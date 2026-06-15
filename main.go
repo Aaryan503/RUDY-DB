@@ -94,7 +94,6 @@ func main() {
 				fmt.Printf("\n%d row(s)\n", len(v.Rows))
 
 			case Row:
-				fmt.Println("Inserted:")
 				for k, val := range v {
 					fmt.Printf("  %s = %v\n", k, val)
 				}
