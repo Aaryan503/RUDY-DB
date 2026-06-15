@@ -66,6 +66,7 @@ func (l *Lexer) nextToken() Token {
 		tok = Token{Type: TokenEOF, Value: ""}
 	case '=':
 		if l.peekChar() == '=' {
+			l.readChar()
 			tok = Token{Type: TokenSymbol, Value: "="}
 		} else {
 			tok = Token{Type: TokenSymbol, Value: "="}
@@ -170,8 +171,8 @@ func isDigit(ch byte) bool {
 func lookupIdentifier(ident string) TokenType {
 	keywords := map[string]bool{
 		"SELECT": true, "FROM": true, "CREATE": true, "TABLE": true, "INSERT": true, "INTO": true, "VALUES": true,
-		"WHERE": true, "DELETE": true, "DROP": true, "AND": true, "OR": true, "NOT": true, "UPDATE": true, "SET": true, "LIMIT": true, "DISTINCT": true,
-		"SUM": true, "AVG": true, "COUNT": true, "MIN": true, "MAX": true,
+		"WHERE": true, "DELETE": true, "DROP": true, "AND": true, "OR": true, "NOT": true, "UPDATE": true, "SET": true,
+		"LIMIT": true, "DISTINCT": true, "SUM": true, "AVG": true, "COUNT": true, "MIN": true, "MAX": true,
 	}
 	if keywords[strings.ToUpper(ident)] {
 		return TokenKeyword

@@ -340,10 +340,6 @@ func applyAggregates(rows []Row, aggregates []Aggregate, columns []Column) (Row,
 				case float64:
 					val = v
 				}
-				val, ok := row[aggregate.Field].(float64)
-				if !ok {
-					continue
-				}
 				sum += val
 				if first || val < min {
 					min = val

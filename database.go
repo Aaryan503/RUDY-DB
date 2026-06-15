@@ -86,7 +86,7 @@ func (db *Database) insertRow(tableName string, row Row) (Row, error) {
 	table.lock.Lock()
 	defer table.lock.Unlock()
 	table.NextRowId++
-	rowID := fmt.Sprintf("row %f", table.NextRowId)
+	rowID := fmt.Sprintf("row %d", int(table.NextRowId))
 	_, exists = table.Rows[rowID]
 	if exists {
 		return nil, fmt.Errorf("row already exists")
@@ -381,8 +381,8 @@ func (db *Database) createSnapshot() error {
 		LastOpNumber: db.lastOpNumber,
 		Items:        db.tables,
 	}
-	db.mu.RUnlock()
 	err = json.NewEncoder(file).Encode(snap)
+	db.mu.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -400,6 +400,7 @@ func (db *Database) createSnapshot() error {
 	if err != nil {
 		return err
 	}
+	defer wal.Close()
 	db.walFile = wal
 	db.mu.Unlock()
 	return nil
@@ -462,6 +463,11 @@ func (db *Database) loadWAL() error {
 			table, exists := db.tables[op.TableName]
 			if exists {
 				table.Rows[op.RowID] = op.RowData
+				var rowNum float64
+				fmt.Sscanf(op.RowID, "row %f", &rowNum)
+				if rowNum > table.NextRowId {
+					table.NextRowId = rowNum
+				}
 			}
 
 		case "DELETE_ROW":

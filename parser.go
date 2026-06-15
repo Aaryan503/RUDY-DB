@@ -438,6 +438,10 @@ func (p *Parser) parseDeleteStatement() (*DeleteStatement, error) {
 func (p *Parser) parseDropStatement() (*DropStatement, error) {
 	stmt := &DropStatement{}
 	p.nextToken()
+	if strings.ToUpper(p.curToken.Value) != "TABLE" {
+		return nil, fmt.Errorf("expected TABLE before table name, got %s", p.curToken.Value)
+	}
+	p.nextToken()
 	if p.curToken.Type != TokenIdentifier {
 		return nil, fmt.Errorf("expected table name, got %s", p.curToken.Value)
 	}
